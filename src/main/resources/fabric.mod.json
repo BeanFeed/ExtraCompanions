@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "extracompanions",
+  "version": "${version}",
+  "name": "ExtraCompanions",
+  "description": "Adds Little Companions To Minecraft",
+  "authors": [
+    "BeanFeed"
+  ],
+  "contact": {
+    "website": "beanfeed.tk"
+  },
+  "license": "MIT",
+  "icon": "assets/extracompanions/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "tk.beanfeed.extracompanions.client.ExtraCompanionsClient"
+    ],
+    "main": [
+      "tk.beanfeed.extracompanions.ExtraCompanions"
+    ]
+  },
+  "mixins": [
+    "extracompanions.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.10",
+    "fabric": "*",
+    "minecraft": "1.19.2"
+  }
+}
