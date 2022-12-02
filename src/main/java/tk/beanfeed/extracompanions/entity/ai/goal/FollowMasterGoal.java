@@ -9,6 +9,7 @@ import net.minecraft.entity.ai.pathing.PathNodeType;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.WorldView;
+import tk.beanfeed.extracompanions.ExtraCompanions;
 import tk.beanfeed.extracompanions.Utils;
 import tk.beanfeed.extracompanions.entity.CompanionEntity;
 
@@ -20,6 +21,7 @@ public class FollowMasterGoal extends Goal {
     private WorldView world;
     private boolean movingToPlayer = false;
     private boolean hasAlertedPlayer = false;
+    private boolean lastFollowVal = false;
     public FollowMasterGoal(CompanionEntity self, double speed, double maxDistance) {
         this.self = self;
         this.speed = speed;
@@ -30,15 +32,20 @@ public class FollowMasterGoal extends Goal {
     @Override
     public boolean canStart() {
         boolean isCloseAndIn = false;
-        if(self.world.getPlayerByUuid(self.getMasterUUID()) != null && !self.isWaiting() && self.isFollowing()) {
-            if (Utils.distanceTo(self.getBlockPos(), self.getMaster().getBlockPos()) < maxDistance) { isCloseAndIn = true; hasAlertedPlayer = false;}
-            else
-            {
-                if(tryTeleport()) return false;
+        if(self.getMaster() != null) {
+
+            if(self.world.getPlayerByUuid(self.getMasterUUID()) != null && !self.isWaiting() && self.isFollowing()) {
+                if (Utils.distanceTo(self.getBlockPos(), self.getMaster().getBlockPos()) < maxDistance) { isCloseAndIn = true; hasAlertedPlayer = false;}
+                else
+                {
+                    if(tryTeleport()) return false;
+                }
             }
+            if(!isCloseAndIn && !hasAlertedPlayer && !lastFollowVal) { self.getMaster().sendMessage(Text.of("Companion Could Not Reach You")); hasAlertedPlayer = true;}
         }
-        if(!isCloseAndIn && !hasAlertedPlayer) { self.getMaster().sendMessage(Text.of("Companion Could Not Reach You")); hasAlertedPlayer = true;}
-        return false;
+        //ExtraCompanions.printOut(self.isWaiting());
+        lastFollowVal = self.isFollowing();
+        return isCloseAndIn;
     }
 
     @Override
@@ -56,6 +63,7 @@ public class FollowMasterGoal extends Goal {
             this.self.getLookControl().lookAt(this.self.getMaster(), 10.0f, (float)this.self.getMaxLookPitchChange());
             if(Utils.distanceTo(this.self.getBlockPos(), this.self.getMaster().getBlockPos()) > 2 && shouldContinue())
             {
+                if(self.isWaiting()) self.setWaiting();
                 this.navigation.startMovingTo(this.self.getMaster(), speed);
                 movingToPlayer = true;
             }else

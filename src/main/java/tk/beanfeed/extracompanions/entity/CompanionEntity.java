@@ -3,6 +3,8 @@ package tk.beanfeed.extracompanions.entity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.MovementType;
+import net.minecraft.entity.ai.goal.Goal;
+import net.minecraft.entity.ai.goal.PrioritizedGoal;
 import net.minecraft.entity.ai.goal.SwimGoal;
 import net.minecraft.entity.ai.goal.WanderAroundGoal;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
@@ -35,10 +37,13 @@ import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
 import software.bernie.geckolib3.util.GeckoLibUtil;
 import tk.beanfeed.extracompanions.ExtraCompanions;
+import tk.beanfeed.extracompanions.Utils;
+import tk.beanfeed.extracompanions.entity.ai.goal.CompanionWander;
 import tk.beanfeed.extracompanions.entity.ai.goal.FollowMasterGoal;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public class CompanionEntity extends PathAwareEntity implements IAnimatable {
@@ -55,16 +60,19 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
 
     private String pDatS = "extracompanions.compData";
 
-    private WanderAroundGoal wag = new WanderAroundGoal(this, speed, 5);
+    private String name;
+
 
     private static final float speed = 4f / 10f;
     protected CompanionEntity(EntityType<CompanionEntity> entityType, World world) {
         super(entityType, world);
+        name = Utils.getRandomMaleName();
+        this.setCustomName(Text.of(name));
     }
     protected void initGoals() {
         this.goalSelector.add(0, new SwimGoal(this));
         this.goalSelector.add(1, new FollowMasterGoal(this, speed, 14));
-        this.goalSelector.add(2, wag);
+        this.goalSelector.add(2, new CompanionWander(this, speed, 5));
     }
     public static DefaultAttributeContainer.Builder setAttributes() {
 
@@ -84,6 +92,7 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
         nbt.put(pDatS, persistantData);
         if(this.master != null) persistantData.putUuid("Owner", this.getMasterUUID());
         persistantData.putBoolean("isWaiting", isWaiting);
+        persistantData.putBoolean("isFollowing", isFollowing);
         if(this.station != null) persistantData.putIntArray("stationPos", new int[]{this.station.getX(), this.station.getY(), this.station.getZ()});
         super.writeCustomDataToNbt(nbt);
     }
@@ -93,7 +102,8 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
         if(persistantData != null)
         {
             if(persistantData.containsUuid("Owner")) setMaster(this.world.getPlayerByUuid(persistantData.getUuid("Owner")));
-            if(persistantData.contains("isWaiting")) this.isWaiting = nbt.getBoolean("isWaiting");
+            if(persistantData.contains("isWaiting")) this.isWaiting = persistantData.getBoolean("isWaiting");
+            if(persistantData.contains("isFollowing")) this.isFollowing = persistantData.getBoolean("isFollowing");
             if(persistantData.contains("stationPos")) {
                 int[] stationPos = nbt.getIntArray("stationPos");
                 this.station = new BlockPos(stationPos[0], stationPos[1], stationPos[2]);
@@ -137,26 +147,27 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
         persistantData.putUuid("Owner", new UUID(0L, 0L));
     }
     public UUID getMasterUUID() {
-        return master.getUuid();
+        return master != null ? master.getUuid() : new UUID(0,0);
     }
     public boolean isWaiting() { return isWaiting; }
     public boolean isFollowing() { return isFollowing; }
-    private boolean isMoving(boolean includeY) {
-        if(includeY) return this.getVelocity().x == 0 && this.getVelocity().z == 0 && this.getVelocity().y == 0;
-        return this.getVelocity().x == 0 && this.getVelocity().z == 0;
-    }
     public void setFollowing() {
         this.isFollowing = !this.isFollowing;
+        persistantData.putBoolean("isFollowing", this.isFollowing);
         if(isFollowing && isWaiting) setWaiting();
+        if(isFollowing) getMaster().sendMessage(Text.of("Companion Is Now Following You"));
+        ExtraCompanions.printOut("Following State Changed");
     }
     public void setWaiting() {
         this.isWaiting = !this.isWaiting;
         persistantData.putBoolean("isWaiting", this.isWaiting);
-        if(isWaiting) this.goalSelector.remove(wag);
-        else if(!this.goalSelector.getGoals().contains(wag)) this.goalSelector.add(2, wag);
     }
     private boolean isMoving() {
         return !(this.getVelocity().x == 0 && this.getVelocity().z == 0);
+    }
+    private boolean isMoving(boolean includeY) {
+        if(includeY) return this.getVelocity().x == 0 && this.getVelocity().z == 0 && this.getVelocity().y == 0;
+        return this.getVelocity().x == 0 && this.getVelocity().z == 0;
     }
 
     public ActionResult interact(PlayerEntity player, Hand hand) {
@@ -201,8 +212,9 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
             this.leaveMaster();
             if(player instanceof ServerPlayerEntity pl) pl.sendMessage(Text.of("This Companion Is No Longer Yours"));
             return ActionResult.SUCCESS;
-        }else if(itemStack.isEmpty() && getMaster() == player) { setWaiting(); return ActionResult.SUCCESS;}
-        else if(itemStack.isOf(Items.PRISMARINE_CRYSTALS)) { setFollowing(); return ActionResult.SUCCESS; }
+        }else if(itemStack.isOf(Items.PRISMARINE_CRYSTALS)) { setFollowing(); return ActionResult.SUCCESS; }
+        else if(itemStack.getItem() != null && getMaster() == player) { setWaiting(); return ActionResult.SUCCESS;}
+
 
 
         return ActionResult.PASS;
