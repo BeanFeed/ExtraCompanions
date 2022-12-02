@@ -212,7 +212,7 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
             this.leaveMaster();
             if(player instanceof ServerPlayerEntity pl) pl.sendMessage(Text.of("This Companion Is No Longer Yours"));
             return ActionResult.SUCCESS;
-        }else if(itemStack.isOf(Items.PRISMARINE_CRYSTALS)) { setFollowing(); return ActionResult.SUCCESS; }
+        }else if(itemStack.isOf(Items.PRISMARINE_CRYSTALS)) { setFollowing(); ExtraCompanions.printOut("sFTick"); return ActionResult.SUCCESS; }
         else if(itemStack.getItem() != null && getMaster() == player) { setWaiting(); return ActionResult.SUCCESS;}
 
 
