@@ -1,14 +1,12 @@
 package tk.beanfeed.extracompanions.entity;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.MovementType;
-import net.minecraft.entity.ai.goal.Goal;
-import net.minecraft.entity.ai.goal.PrioritizedGoal;
-import net.minecraft.entity.ai.goal.SwimGoal;
-import net.minecraft.entity.ai.goal.WanderAroundGoal;
+import net.minecraft.entity.*;
+import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.passive.PassiveEntity;
@@ -23,8 +21,11 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.util.Util;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.LocalDifficulty;
+import net.minecraft.world.ServerWorldAccess;
 import net.minecraft.world.World;
 import net.minecraft.world.event.GameEvent;
 import software.bernie.geckolib3.core.IAnimatable;
@@ -40,11 +41,10 @@ import tk.beanfeed.extracompanions.ExtraCompanions;
 import tk.beanfeed.extracompanions.Utils;
 import tk.beanfeed.extracompanions.entity.ai.goal.CompanionWander;
 import tk.beanfeed.extracompanions.entity.ai.goal.FollowMasterGoal;
+import tk.beanfeed.extracompanions.entity.variant.CompanionVariant;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import javax.annotation.Nullable;
+import java.util.*;
 
 public class CompanionEntity extends PathAwareEntity implements IAnimatable {
 
@@ -62,17 +62,19 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
 
     private String name;
 
+    private int tickCountDown = 0;
+
 
     private static final float speed = 4f / 10f;
     protected CompanionEntity(EntityType<CompanionEntity> entityType, World world) {
         super(entityType, world);
-        name = Utils.getRandomMaleName();
-        this.setCustomName(Text.of(name));
     }
     protected void initGoals() {
         this.goalSelector.add(0, new SwimGoal(this));
-        this.goalSelector.add(1, new FollowMasterGoal(this, speed, 14));
+        this.goalSelector.add(1, new FollowMasterGoal(this, 14));
         this.goalSelector.add(2, new CompanionWander(this, speed, 5));
+        this.goalSelector.add(5, new LookAroundGoal(this));
+        this.goalSelector.add(4, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
     }
     public static DefaultAttributeContainer.Builder setAttributes() {
 
@@ -84,6 +86,8 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
 
             event.getController().setAnimation(new AnimationBuilder().addAnimation("animation.companion.idle", ILoopType.EDefaultLoopTypes.LOOP));
         } else event.getController().setAnimation(new AnimationBuilder().addAnimation("animation.companion.walk", ILoopType.EDefaultLoopTypes.LOOP));
+        if(event.getController().getCurrentAnimation() != null && Objects.equals(event.getController().getCurrentAnimation().animationName, "animation.companion.walk") && this.isFollowing()){event.getController().setAnimationSpeed(5.0);}
+        else event.getController().setAnimationSpeed(1.0);
         return PlayState.CONTINUE;
     }
 
@@ -94,6 +98,7 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
         persistantData.putBoolean("isWaiting", isWaiting);
         persistantData.putBoolean("isFollowing", isFollowing);
         if(this.station != null) persistantData.putIntArray("stationPos", new int[]{this.station.getX(), this.station.getY(), this.station.getZ()});
+        persistantData.putInt("Variant", this.getTypeVariant());
         super.writeCustomDataToNbt(nbt);
     }
 
@@ -108,6 +113,7 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
                 int[] stationPos = nbt.getIntArray("stationPos");
                 this.station = new BlockPos(stationPos[0], stationPos[1], stationPos[2]);
             }
+            if(persistantData.contains("Variant")) this.dataTracker.set(DATA_ID_TYPE_VARIANT, persistantData.getInt("Variant"));
         }
 
         super.readCustomDataFromNbt(nbt);
@@ -155,8 +161,7 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
         this.isFollowing = !this.isFollowing;
         persistantData.putBoolean("isFollowing", this.isFollowing);
         if(isFollowing && isWaiting) setWaiting();
-        if(isFollowing) getMaster().sendMessage(Text.of("Companion Is Now Following You"));
-        ExtraCompanions.printOut("Following State Changed");
+
     }
     public void setWaiting() {
         this.isWaiting = !this.isWaiting;
@@ -171,6 +176,8 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
     }
 
     public ActionResult interact(PlayerEntity player, Hand hand) {
+        if(tickCountDown != 0) return ActionResult.FAIL;
+        tickCountDown += 10;
         if (!this.isAlive()) {
             return ActionResult.PASS;
         } else if (this.getHoldingEntity() == player) {
@@ -212,8 +219,12 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
             this.leaveMaster();
             if(player instanceof ServerPlayerEntity pl) pl.sendMessage(Text.of("This Companion Is No Longer Yours"));
             return ActionResult.SUCCESS;
-        }else if(itemStack.isOf(Items.PRISMARINE_CRYSTALS)) { setFollowing(); ExtraCompanions.printOut("sFTick"); return ActionResult.SUCCESS; }
-        else if(itemStack.getItem() != null && getMaster() == player) { setWaiting(); return ActionResult.SUCCESS;}
+        }else if(itemStack.isOf(Items.PRISMARINE_CRYSTALS)) {
+            setFollowing();
+            if(player instanceof ServerPlayerEntity pl) pl.sendMessage(Text.of("Companion Is Now Following You"));
+            return ActionResult.SUCCESS;
+        }
+        else if(itemStack.getItem() != null && getMaster() == player && player instanceof ServerPlayerEntity) { setWaiting(); return ActionResult.SUCCESS;}
 
 
 
@@ -223,7 +234,44 @@ public class CompanionEntity extends PathAwareEntity implements IAnimatable {
     @Override
     public boolean canBeLeashedBy(PlayerEntity player) { return false; }
     public void tick() {
+        if(tickCountDown > 0) tickCountDown--;
         super.tick();
         //ExtraCompanions.printOut(Boolean.toString(this.getVelocity().x == 0 && this.getVelocity().z == 0));
+    }
+
+    @Override
+    protected void initDataTracker() {
+        super.initDataTracker();
+        this.dataTracker.startTracking(DATA_ID_TYPE_VARIANT, 0);
+    }
+
+    //Variant Stuff
+    private static final TrackedData<Integer> DATA_ID_TYPE_VARIANT =
+            DataTracker.registerData(CompanionEntity.class, TrackedDataHandlerRegistry.INTEGER);
+
+    public EntityData initialize(ServerWorldAccess world, LocalDifficulty difficulty, SpawnReason spawnReason, @Nullable EntityData entityData, @Nullable NbtCompound entityNbt) {
+        CompanionVariant variant = Util.getRandom(CompanionVariant.values(), this.random);
+        setVariant(variant);
+        int varID = variant.getId();
+        if(Utils.isWithin(varID,0,4)) {
+            name = Utils.getRandomMaleName();
+            this.setCustomName(Text.of(name));
+        } else {
+            name = Utils.getRandomFemaleName();
+            this.setCustomName(Text.of(name));
+        }
+        return super.initialize(world, difficulty, spawnReason, entityData, entityNbt);
+    }
+
+    public CompanionVariant getVariant() {
+        return CompanionVariant.byId(this.getTypeVariant() & 255);
+    }
+
+    private int getTypeVariant() {
+        return this.dataTracker.get(DATA_ID_TYPE_VARIANT);
+    }
+
+    private void setVariant(CompanionVariant variant) {
+        this.dataTracker.set(DATA_ID_TYPE_VARIANT, variant.getId() & 255);
     }
 }

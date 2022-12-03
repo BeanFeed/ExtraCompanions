@@ -15,16 +15,15 @@ import tk.beanfeed.extracompanions.entity.CompanionEntity;
 
 public class FollowMasterGoal extends Goal {
     private CompanionEntity self;
-    private double speed;
+    private double speed = 1.0;
     private double maxDistance;
     private EntityNavigation navigation;
     private WorldView world;
     private boolean movingToPlayer = false;
     private boolean hasAlertedPlayer = false;
     private boolean lastFollowVal = false;
-    public FollowMasterGoal(CompanionEntity self, double speed, double maxDistance) {
+    public FollowMasterGoal(CompanionEntity self, double maxDistance) {
         this.self = self;
-        this.speed = speed;
         this.maxDistance = maxDistance;
         this.navigation = self.getNavigation();
         this.world = self.world;
@@ -32,15 +31,16 @@ public class FollowMasterGoal extends Goal {
     @Override
     public boolean canStart() {
         boolean isCloseAndIn = false;
-        if(self.getMaster() != null) {
+        if(self.getMaster() != null && self.isFollowing()) {
 
-            if(self.world.getPlayerByUuid(self.getMasterUUID()) != null && !self.isWaiting() && self.isFollowing()) {
+            if(self.world.getPlayerByUuid(self.getMasterUUID()) != null) {
                 if (Utils.distanceTo(self.getBlockPos(), self.getMaster().getBlockPos()) < maxDistance) { isCloseAndIn = true; hasAlertedPlayer = false;}
                 else
                 {
                     if(tryTeleport()) return false;
                 }
             }
+
             if(!isCloseAndIn && !hasAlertedPlayer && !lastFollowVal) { self.getMaster().sendMessage(Text.of("Companion Could Not Reach You")); hasAlertedPlayer = true;}
         }
         //ExtraCompanions.printOut(self.isWaiting());
