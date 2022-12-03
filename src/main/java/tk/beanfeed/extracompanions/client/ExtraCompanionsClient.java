@@ -14,7 +14,7 @@ public class ExtraCompanionsClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         EntityRendererRegistry.register(EntityRegister.TESTMOB, TestEntityRenderer::new);
-        EntityRendererRegistry.register(EntityRegister.COMPANIONENTITY, CompanionEntityRenderer::new);
+        EntityRendererRegistry.register(EntityRegister.COMPANION, CompanionEntityRenderer::new);
         //EntityModelLayerRegistry.registerModelLayer(Model_TestMob_Layer, TestMobModel::getTexturedModelData);
     }
 }

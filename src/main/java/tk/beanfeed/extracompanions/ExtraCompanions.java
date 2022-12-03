@@ -2,6 +2,7 @@ package tk.beanfeed.extracompanions;
 
 import net.fabricmc.api.ModInitializer;
 import software.bernie.geckolib3.GeckoLib;
+import tk.beanfeed.extracompanions.Items.ItemRegister;
 import tk.beanfeed.extracompanions.entity.EntityRegister;
 
 public class ExtraCompanions implements ModInitializer {
@@ -20,5 +21,6 @@ public class ExtraCompanions implements ModInitializer {
         GeckoLib.initialize();
         //BlockRegister.Register();
         EntityRegister.Register();
+        ItemRegister.register();
     }
 }

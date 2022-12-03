@@ -17,7 +17,7 @@ public class EntityRegister {
             FabricEntityTypeBuilder.create(SpawnGroup.CREATURE, TestEntity::new).dimensions(EntityDimensions.fixed(0.3f,1.1f)).build()
     );
 
-    public static final EntityType<CompanionEntity> COMPANIONENTITY = Registry.register(
+    public static final EntityType<CompanionEntity> COMPANION = Registry.register(
             Registry.ENTITY_TYPE,
             new Identifier(ExtraCompanions.MOD_ID, "companion"),
             FabricEntityTypeBuilder.create(SpawnGroup.CREATURE, CompanionEntity::new).dimensions(EntityDimensions.fixed(0.5625f, 0.9375f)).build()
@@ -26,6 +26,6 @@ public class EntityRegister {
 
     public static void Register() {
         FabricDefaultAttributeRegistry.register(TESTMOB, TestEntity.setAttributes());
-        FabricDefaultAttributeRegistry.register(COMPANIONENTITY, CompanionEntity.setAttributes());
+        FabricDefaultAttributeRegistry.register(COMPANION, CompanionEntity.setAttributes());
     }
 }
